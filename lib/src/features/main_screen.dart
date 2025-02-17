@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -9,12 +11,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   TextEditingController zip = TextEditingController();
-  Future<String>? cityFuture;
-
-  @override
-  void initState() {
-    super.initState();
-  }
+  Future<http.Response>? cityFuture;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +35,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: const Text("Suche"),
               ),
               const SizedBox(height: 32),
-              FutureBuilder<String>(
+              FutureBuilder<http.Response>(
                 future: cityFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -46,7 +43,12 @@ class _MainScreenState extends State<MainScreen> {
                   } else if (snapshot.hasError) {
                     return const Text("Fehler aufgetreten");
                   } else if (snapshot.hasData) {
-                    return Text(snapshot.data ?? 'Keine Daten');
+                    final data = snapshot.data?.body ?? '';
+                    return data.length >
+                            3 // empty data -> result is empty list ('[]')
+                        ? Text(jsonDecode(data).first['name'] ??
+                            'Unbekannter Name')
+                        : const Text('Ungültige Postleitzahl');
                   } else {
                     return const Text("Ergebnis: Noch keine PLZ gesucht");
                   }
@@ -65,24 +67,8 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
-  Future<String> getCityFromZip(String zip) async {
-    // simuliere Dauer der Datenbank-Anfrage
-    await Future.delayed(const Duration(seconds: 3));
-
-    switch (zip) {
-      case "10115":
-        return 'Berlin';
-      case "20095":
-        return 'Hamburg';
-      case "80331":
-        return 'München';
-      case "50667":
-        return 'Köln';
-      case "60311":
-      case "60313":
-        return 'Frankfurt am Main';
-      default:
-        return 'Unbekannte Stadt';
-    }
+  Future<http.Response> getCityFromZip(String zip) {
+    return http
+        .get(Uri.parse("https://openplzapi.org/de/Localities?postalCode=$zip"));
   }
 }
